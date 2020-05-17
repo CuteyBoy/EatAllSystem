@@ -39,5 +39,5 @@ class FinancialProjectTable(AbsTable):
     该表主要存放财务报表（合并负债表、合并利润表、合并现金流量表）
     里面的各项参数，方便后面进行统计计算
     """
-    def __int__(self):
+    def __init__(self):
         super().__init__(FINANCIAL_PROJECT_TABLE)

@@ -81,7 +81,7 @@ class AbsTable(metaclass=abc.ABCMeta):
         if table:
             return table.insert_many(documents, ordered, bypass_document_validation, session)
         else:
-            logging.debug("The table is None")
+             logging.debug("The table is None")
 
     def delete_one(self, filter_op, collation=None, session=None):
         """
@@ -204,6 +204,7 @@ class TableFields(object):
                     index = 0
                     for var in var_dirt:
                         table[var] = args[index]
+                        index += 1
                 return table
 
             cls.create_table = types.MethodType(create_table, cls)

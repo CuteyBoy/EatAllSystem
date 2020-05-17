@@ -6,7 +6,7 @@ STOCK_TABLE = "stock_table"
 
 @TableFields(
     # 所在交易所类型字段
-    exchange_type=str,
+    market_type=str,
     # 股票代码字段
     stock_code=str,
     # 股票名字字段
@@ -38,5 +38,5 @@ class StockTable(AbsTable):
             start_time: 上市时间
         }
         """
-    def __int__(self):
+    def __init__(self):
         super().__init__(STOCK_TABLE)
