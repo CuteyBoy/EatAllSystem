@@ -7,21 +7,33 @@ from app.src.data.database.table.StockFrTable import StockFrTable
 
 class FrDownload(AsyncRequest):
 
+    def __init__(self):
+        self.pageSize = 30
+        self.pdf_path_key = "attachPath"
+        self.title_key = "title"
+        self.pdf_size_key = "attachSize"
+        self.data_size_key = "announceCount"
+        # 010301 年报 010307 三季度报 010303半年报 010305一季度报
+        self.bigCategoryId = ["010301", "010307", "010303", "010305"]
+        self.table = StockFrTable()
+
     async def _success_handle(self, url, response):
         pass
 
     async def _fail_handle(self, url, error_code):
         pass
 
-    @classmethod
-    def _pack_params(cls, code, page_size, page_index):
-        start_time = StockTimeUtils.get_start_time()
+    def _pack_params(self, code, start_time, page_size, page_index):
+        # 如果没有传开始时间
+        if start_time is None:
+            # 则取结束时间的差5年的时间
+            start_time = StockTimeUtils.get_start_time()
         end_time = StockTimeUtils.get_now_time_str()
         return {
             "seDate": [start_time if start_time else "", end_time if end_time else ""],
             "stock": [code if code else "000001"],
             "channelCode": ["fixed_disc"],
-            "bigCategoryId": ["010301"],
+            "bigCategoryId": self.bigCategoryId[0],
             "pageSize": page_size,
             "pageNum": page_index if page_index else 1
         }
@@ -48,7 +60,19 @@ class FrDownload(AsyncRequest):
     def _get_url(cls):
         return "http://www.szse.cn/api/disc/announcement/annList?random=%s" % random.random()
 
-    def download_to_db(self):
-        url = self._get_url()
-        headers = self._headers()
-        params = self._pack_params("", 20, 0)
+    def download_to_db(self, download_fail_stock_list=None):
+        if download_fail_stock_list is None:
+            # 没有下载失败的股票则表示覆盖下载股票财报数据
+            self.table.drop()
+            url = self._get_url()
+            headers = self._headers()
+            params = self._pack_params("", "", 20, 0)
+            stock_table = StockTable()
+            stock_list = stock_table.find(filter={}, projection={
+                "_id": 0,
+                "stock_code": "0",
+                "market_time": "0"
+            })
+        elif isinstance(download_fail_stock_list, list) and len(download_fail_stock_list) > 0:
+            pass
+
