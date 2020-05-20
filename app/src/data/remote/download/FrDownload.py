@@ -73,6 +73,8 @@ class FrDownload(AsyncRequest):
                 "stock_code": "0",
                 "market_time": "0"
             })
+            if len(stock_list) > 0:
+                index = 0
         elif isinstance(download_fail_stock_list, list) and len(download_fail_stock_list) > 0:
             pass
 

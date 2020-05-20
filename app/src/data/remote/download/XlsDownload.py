@@ -105,4 +105,4 @@ class XlsDownload(AsyncRequest):
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1"
         }
-        self.async_request(url, params=params, headers=headers)
+        self.run_tasks(url, params=params, headers=headers)

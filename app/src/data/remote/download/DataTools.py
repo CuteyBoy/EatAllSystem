@@ -3,7 +3,51 @@ import aiohttp as http
 import abc
 
 
-class AsyncRequest(metaclass=abc.ABCMeta):
+class AsyncTask(metaclass=abc.ABCMeta):
+    """
+    封装使用协程来执行异步任务的抽象类
+    """
+
+    @abc.abstractmethod
+    async def task(self, data, **kwargs):
+        """
+        子类需要实现的任务方法，在改方法内处理耗时任务
+        :param data: 每个任务的数据
+        :param kwargs: 其他需要参数
+        """
+        pass
+
+    @abc.abstractmethod
+    async def package_tasks(self, data_list, **kwargs):
+        """
+        子类需要调用create_tasks方法来进行重新组装任务列表
+        :param data_list: 需要处理的数据列表
+        :param kwargs: 其他需要的参数
+        """
+        pass
+
+    async def create_tasks(self, data_list, **kwargs):
+        """
+        创建任务列表，由子类在package_tasks()方法中调用
+        :param data_list: 需要处理的数据列表
+        :param kwargs: 其他需要的参数，由上层决定，最终在task方法用到
+        """
+        if isinstance(data_list, list) and len(data_list) > 0:
+            task_list = [asyncio.create_task(self.task(data, **kwargs)) for data in data_list]
+            await asyncio.gather(*task_list)
+        else:
+            print("数据列表是空，不需要创建任何任务")
+
+    def run_tasks(self, data_list, **kwargs):
+        """
+        运行任务列表，需要自己主动调用运行
+        :param data_list: 需要处理的数据列表
+        :param kwargs: 其他需要的参数
+        """
+        asyncio.run(self.package_tasks(data_list, **kwargs))
+
+
+class AsyncRequest(AsyncTask):
     """
     数据工具类，主要封装数据的异步请求以及下载等操作
     """
@@ -26,13 +70,13 @@ class AsyncRequest(metaclass=abc.ABCMeta):
         """
         pass
 
-    async def _result_handle(self, url, response):
+    async def _result_handle(self, url, response=None):
         """
         结果通过在该方法中进行处理
         :param url: 请求地址
         :param response: 请求响应体
         """
-        error_code = response.status
+        error_code = response.status if response else -200
         if error_code == 200:
             # 请求成功子类需要处理的
             await self._success_handle(url, response)
@@ -40,52 +84,30 @@ class AsyncRequest(metaclass=abc.ABCMeta):
             # 请求失败子类需要处理的
             await self._fail_handle(url, error_code)
 
-    async def _task(self, client, url, **kwargs):
-        """
-        协程需要执行的任务方法，该方法主要是用来实现请求数据，包括get或post请求
-        :param client: session对象
-        :param url: 请求地址
-        :param kwargs: 请求需要其他参数
-        比如参数method
-        get请求的params={"key": 000}
-        headers={"Connection":"0"}
-        post请求的data=json字符串
-        """
-        method = kwargs.get("method")
-        if method is None or method == "GET":
-            async with client.get(url, params=kwargs.get("params"), headers=kwargs.get("headers")) as response:
-                await self._result_handle(url, response)
-        else:
-            async with client.post(url, data=kwargs.get("data"), headers=kwargs.get("headers")) as response:
-                await self._result_handle(url, response)
+    async def task(self, data, **kwargs):
+        client = kwargs.get("client")
+        is_fail_handle = False
+        if client:
+            # 请求地址不为空才进行下面的处理
+            if data:
+                # 获取请求类型
+                method = kwargs.get("method")
+                if method is None or method == "GET":
+                    # GET请求方法
+                    async with client.get(data, params=kwargs.get("params"), headers=kwargs.get("headers")) as response:
+                        is_fail_handle = True
+                        await self._result_handle(data, response)
+                else:
+                    # POST 请求方法
+                    async with client.post(data, data=kwargs.get("data"), headers=kwargs.get("headers")) as response:
+                        is_fail_handle = True
+                        await self._result_handle(data, response)
+        if is_fail_handle is False:
+            # 处理错误的情况
+            await self._result_handle(data)
 
-    async def _start_request(self, urls, **kwargs):
-        """
-        该方法用来组装任务，比如urls如何是一个list需要调用_task创建异步任务
-        :param urls: 这个参数可以传一个url或者list类型的url
-        :param kwargs: 可以选参数
-        """
+    async def package_tasks(self, data_list, **kwargs):
         async with http.ClientSession(cookies=kwargs.get("cookies")) as client:
-            task_list = None
-            if isinstance(urls, list) and len(urls) > 0:
-                # 创建多个任务
-                task_list = [asyncio.create_task(self._task(client, url, **kwargs)) for url in urls]
-            elif isinstance(urls, str) and len(urls) > 0:
-                # 创建单个任务
-                task_list = [asyncio.create_task(self._task(client, urls, **kwargs))]
-            if task_list:
-                # 一起提交执行任务
-                await asyncio.gather(*task_list)
+            # 重新组装任务列表
+            await self.create_tasks(data_list, client=client, **kwargs)
 
-    def async_request(self, urls, **kwargs):
-        """
-        异步请求数据，该方法包括get和post请求数据
-        :param urls: 请求地址，可以是一个请求列表，也可以是单个请求
-        :param kwargs: 一些请求的参数，比如
-        method=GET或POST;
-        headers={}
-        cookies={}
-        POST请求的时候data=json
-        GET请求的的时候参数params={}
-        """
-        asyncio.run(self._start_request(urls, **kwargs))
