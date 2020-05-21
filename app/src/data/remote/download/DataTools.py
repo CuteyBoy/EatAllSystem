@@ -17,16 +17,15 @@ class AsyncTask(metaclass=abc.ABCMeta):
         """
         pass
 
-    @abc.abstractmethod
     async def package_tasks(self, data_list, **kwargs):
         """
         子类需要调用create_tasks方法来进行重新组装任务列表
         :param data_list: 需要处理的数据列表
         :param kwargs: 其他需要的参数
         """
-        pass
+        await self._create_tasks(data_list, **kwargs)
 
-    async def create_tasks(self, data_list, **kwargs):
+    async def _create_tasks(self, data_list, **kwargs):
         """
         创建任务列表，由子类在package_tasks()方法中调用
         :param data_list: 需要处理的数据列表
@@ -109,5 +108,5 @@ class AsyncRequest(AsyncTask):
     async def package_tasks(self, data_list, **kwargs):
         async with http.ClientSession(cookies=kwargs.get("cookies")) as client:
             # 重新组装任务列表
-            await self.create_tasks(data_list, client=client, **kwargs)
+            await self._create_tasks(data_list, client=client, **kwargs)
 
