@@ -19,12 +19,20 @@ class AsyncFrDownload(AsyncTask):
         self.title_key = "title"
         self.pdf_size_key = "attachSize"
         self.data_size_key = "announceCount"
+        self.publishTime_key = "publishTime"
         # 010301 年报 010307 三季度报 010303半年报 010305一季度报
         self.bigCategoryId = ["010301", "010307", "010303", "010305"]
 
     @classmethod
     def _get_url(cls):
         return "http://www.szse.cn/api/disc/announcement/annList?random=%s" % random.random()
+
+    @classmethod
+    def _get_cookies(cls):
+        return {
+            "Cookie": "CASTGC=TGT-477-dIxsAc1g1gRKtYb3G2ioR2tOWxB2tw9PfxZpMlGCmHnujZxVGi-cas01.example.org; "
+                      "JSESSIONID=719b57a5-9054-4912-b070-626d18709c1e",
+        }
 
     @classmethod
     def _get_headers(cls):
@@ -51,30 +59,29 @@ class AsyncFrDownload(AsyncTask):
             "seDate": [start_time if start_time else "", end_time if end_time else ""],
             "stock": [code if code else "000001"],
             "channelCode": ["fixed_disc"],
-            "bigCategoryId": self.bigCategoryId[0],
+            "bigCategoryId": [self.bigCategoryId[0]],
             "pageSize": page_size,
-            "pageNum": page_index if page_index else 1
+            "pageNum": page_index
         }
 
     async def package_tasks(self, data_list, **kwargs):
-        async with aiohttp.ClientSession(cookies=kwargs.get("cookies")) as client:
+        async with aiohttp.ClientSession() as client:
             await self._create_tasks(data_list, client=client, **kwargs)
 
     async def task(self, stock, **kwargs):
         client = kwargs.get("client")
         if client and stock:
+            url = self._get_url()
             stock_code = stock["stock_code"]
             start_time = stock["market_time"]
             page_index = kwargs.get("page_index")
-            url = self._get_url()
-            headers = self._get_headers()
+            page_index = page_index if page_index else 1
             params = self._get_params(stock_code, start_time, self.pageSize, page_index)
-            if page_index is None or page_index == 0:
-                print("开始请求股票 %s" % stock_code)
-            async with client.get(url, params=params, headers=headers) as response:
+            print("开始请求股票 %s" % stock_code)
+            async with client.post(url, json=params, headers=self._get_headers()) as response:
                 if response.status == 200:
                     result = await response.json(encoding="utf-8")
-                    await self._fr_parser_to_db(client, result, stock, stock_code, page_index + 1)
+                    await self._fr_parser_to_db(client, result, stock, stock_code, page_index)
                 else:
                     print("请求失败 错误码为%s" % response.status)
         else:
@@ -101,6 +108,7 @@ class AsyncFrDownload(AsyncTask):
                         stock_code,
                         title,
                         pdf_path,
+                        fr[self.publishTime_key],
                         fr[self.pdf_size_key],
                         ""
                     ))
@@ -134,6 +142,10 @@ class AsyncFrDownload(AsyncTask):
         self.table.drop()
         # 开始请求数据
         self.run_tasks(stock_list)
+
+    @classmethod
+    def get_semaphore_count(cls):
+        return 1
 
 
 AsyncFrDownload().start_download()

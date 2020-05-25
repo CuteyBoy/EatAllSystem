@@ -17,6 +17,19 @@ class AsyncTask(metaclass=abc.ABCMeta):
         """
         pass
 
+    async def semaphore_task(self, data, **kwargs):
+        """
+        并发执行多任务
+        :param data: 数据
+        :param kwargs: 其他参数
+        """
+        semaphore = kwargs.get("semaphore")
+        if semaphore:
+            async with semaphore:
+                await self.task(data, **kwargs)
+        else:
+            await self.task(data, **kwargs)
+
     async def package_tasks(self, data_list, **kwargs):
         """
         子类需要调用create_tasks方法来进行重新组装任务列表
@@ -32,7 +45,8 @@ class AsyncTask(metaclass=abc.ABCMeta):
         :param kwargs: 其他需要的参数，由上层决定，最终在task方法用到
         """
         if isinstance(data_list, list) and len(data_list) > 0:
-            task_list = [asyncio.create_task(self.task(data, **kwargs)) for data in data_list]
+            semaphore = asyncio.Semaphore(self.get_semaphore_count())
+            task_list = [asyncio.create_task(self.semaphore_task(data, semaphore=semaphore, **kwargs)) for data in data_list]
             await asyncio.gather(*task_list)
         else:
             print("数据列表是空，不需要创建任何任务")
@@ -44,6 +58,14 @@ class AsyncTask(metaclass=abc.ABCMeta):
         :param kwargs: 其他需要的参数
         """
         asyncio.run(self.package_tasks(data_list, **kwargs))
+
+    @classmethod
+    def get_semaphore_count(cls):
+        """
+        获取并发个数，默认是1
+        :return: 1
+        """
+        return 1
 
 
 class AsyncRequest(AsyncTask):
@@ -93,12 +115,14 @@ class AsyncRequest(AsyncTask):
                 method = kwargs.get("method")
                 if method is None or method == "GET":
                     # GET请求方法
-                    async with client.get(data, params=kwargs.get("params"), headers=kwargs.get("headers")) as response:
+                    async with client.get(data, params=kwargs.get("params"),
+                                          headers=kwargs.get("headers")) as response:
                         is_fail_handle = True
                         await self._result_handle(data, response)
                 else:
                     # POST 请求方法
-                    async with client.post(data, data=kwargs.get("data"), headers=kwargs.get("headers")) as response:
+                    async with client.post(data, data=kwargs.get("data"),
+                                           headers=kwargs.get("headers")) as response:
                         is_fail_handle = True
                         await self._result_handle(data, response)
         if is_fail_handle is False:
