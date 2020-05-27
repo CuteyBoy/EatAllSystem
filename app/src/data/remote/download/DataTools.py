@@ -1,12 +1,18 @@
 import asyncio
 import aiohttp as http
 import abc
+import random
+from app.src.utils.TimeUtils import StockTimeUtils
 
 
 class AsyncTask(metaclass=abc.ABCMeta):
     """
     封装使用协程来执行异步任务的抽象类
     """
+
+    def __init__(self, concurrent_num=1):
+        # 任务并发个数，默认是10
+        self.concurrent_num = concurrent_num
 
     @abc.abstractmethod
     async def task(self, data, **kwargs):
@@ -17,13 +23,13 @@ class AsyncTask(metaclass=abc.ABCMeta):
         """
         pass
 
-    async def semaphore_task(self, data, **kwargs):
+    async def semaphore_task(self, data, semaphore, **kwargs):
         """
         并发执行多任务
         :param data: 数据
+        :param semaphore 用于控制并发数量
         :param kwargs: 其他参数
         """
-        semaphore = kwargs.get("semaphore")
         if semaphore:
             async with semaphore:
                 await self.task(data, **kwargs)
@@ -45,8 +51,8 @@ class AsyncTask(metaclass=abc.ABCMeta):
         :param kwargs: 其他需要的参数，由上层决定，最终在task方法用到
         """
         if isinstance(data_list, list) and len(data_list) > 0:
-            semaphore = asyncio.Semaphore(self.get_semaphore_count())
-            task_list = [asyncio.create_task(self.semaphore_task(data, semaphore=semaphore, **kwargs)) for data in data_list]
+            semaphore = asyncio.Semaphore(self.concurrent_num)
+            task_list = [asyncio.create_task(self.semaphore_task(data, semaphore, **kwargs)) for data in data_list]
             await asyncio.gather(*task_list)
         else:
             print("数据列表是空，不需要创建任何任务")
@@ -57,15 +63,55 @@ class AsyncTask(metaclass=abc.ABCMeta):
         :param data_list: 需要处理的数据列表
         :param kwargs: 其他需要的参数
         """
-        asyncio.run(self.package_tasks(data_list, **kwargs))
+        if isinstance(data_list, list):
+            data_list = self._split(data_list)
+            if data_list:
+                index = 0
+                task_total_size = len(data_list)
+                print("任务总大小为%s" % task_total_size)
+                for task_list in data_list:
+                    try:
+                        delay_des = "，延时0秒"
+                        if index != 0:
+                            interval_time = self.interval_time()
+                            StockTimeUtils.sleep(interval_time)
+                            delay_des = "，延时%s秒" % interval_time
+                        print("开始执行第%s个任务%s" % (index + 1, delay_des))
+                        asyncio.run(self.package_tasks(task_list, **kwargs))
+                    except(KeyboardInterrupt, SystemExit):
+                        print("退出所有的任务")
+                        break
+                    index += 1
+
+    def interval_time(self):
+        """
+        获取执行的间隔时间
+        :return: 返回随机时间，单位是秒
+        """
+        return self.get_random_time(1, 5)
 
     @classmethod
-    def get_semaphore_count(cls):
+    def get_random_time(cls, min_time, max_time):
         """
-        获取并发个数，默认是1
-        :return: 1
+        返回随机时间，单位是秒
+        :param min_time: 最小时间
+        :param max_time: 最大时间
+        :return: 随机时间，单位是秒
         """
-        return 1
+        return random.randint(min_time, max_time)
+
+    def _split(self, o_list):
+        """
+        将原列表切割成均等大小的小列表，如果原列表没有是数据，则返回None
+        :param o_list: 原列表数据
+        :return: 返回切割后的数据列表或者None
+        """
+        if isinstance(o_list, list):
+            o_list_size = len(o_list)
+            if o_list_size > 0:
+                new_list = [o_list[i: i + self.concurrent_num] for i in range(0, o_list_size, self.concurrent_num)]
+                return new_list
+        return None
 
 
 class AsyncRequest(AsyncTask):
@@ -133,4 +179,3 @@ class AsyncRequest(AsyncTask):
         async with http.ClientSession(cookies=kwargs.get("cookies")) as client:
             # 重新组装任务列表
             await self._create_tasks(data_list, client=client, **kwargs)
-

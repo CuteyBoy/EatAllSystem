@@ -12,6 +12,7 @@ DPF_DOWNLOAD_BASE_URL = "http://disc.static.szse.cn/download"
 class AsyncFrDownload(AsyncTask):
 
     def __init__(self):
+        super().__init__()
         self.table = StockFrTable()
         self.pageSize = 30
         self.data_key = "data"
@@ -52,8 +53,9 @@ class AsyncFrDownload(AsyncTask):
             "X-Request-Type": "ajax"
         }
 
-    def _get_params(self, code, start_time, page_size, page_index):
-        start_time = StockTimeUtils.get_start_time()
+    def _get_params(self, code, page_size, page_index, start_time=None):
+        if start_time is None:
+            start_time = StockTimeUtils.get_start_time()
         end_time = StockTimeUtils.get_now_time_str()
         return {
             "seDate": [start_time if start_time else "", end_time if end_time else ""],
@@ -76,7 +78,7 @@ class AsyncFrDownload(AsyncTask):
             start_time = stock["market_time"]
             page_index = kwargs.get("page_index")
             page_index = page_index if page_index else 1
-            params = self._get_params(stock_code, start_time, self.pageSize, page_index)
+            params = self._get_params(stock_code, self.pageSize, page_index)
             print("开始请求股票 %s" % stock_code)
             async with client.post(url, json=params, headers=self._get_headers()) as response:
                 if response.status == 200:
@@ -128,7 +130,7 @@ class AsyncFrDownload(AsyncTask):
         else:
             print("请求结果为None")
 
-    def start_download(self):
+    def start_download(self, is_need_drop_table=False):
         from app.src.data.database.table.StockTable import StockTable
         stock_table = StockTable()
         stock_cursor = stock_table.find(filter={}, projection={
@@ -139,13 +141,12 @@ class AsyncFrDownload(AsyncTask):
         stock_list = [stock for stock in stock_cursor]
         print("需要请求的股票数量有%s" % len(stock_list))
         # 先清除表内容
-        self.table.drop()
-        # 开始请求数据
+        if is_need_drop_table:
+            self.table.drop()
+        # 设置并发数量，为10
+        self.concurrent_num = 15
+        # 开始请求数据 完成87个任务
         self.run_tasks(stock_list)
-
-    @classmethod
-    def get_semaphore_count(cls):
-        return 1
 
 
 AsyncFrDownload().start_download()
