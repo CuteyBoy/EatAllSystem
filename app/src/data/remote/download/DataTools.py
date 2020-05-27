@@ -68,11 +68,17 @@ class AsyncTask(metaclass=abc.ABCMeta):
             if data_list:
                 index = 0
                 task_total_size = len(data_list)
+                last_fail_index = kwargs.get("last_fail_index")
+                if last_fail_index:
+                    index = last_fail_index
+                    data_list = data_list[last_fail_index: -1]
+                else:
+                    last_fail_index = 0
                 print("任务总大小为%s" % task_total_size)
                 for task_list in data_list:
                     try:
                         delay_des = "，延时0秒"
-                        if index != 0:
+                        if index != last_fail_index:
                             interval_time = self.interval_time()
                             StockTimeUtils.sleep(interval_time)
                             delay_des = "，延时%s秒" % interval_time
@@ -80,6 +86,9 @@ class AsyncTask(metaclass=abc.ABCMeta):
                         asyncio.run(self.package_tasks(task_list, **kwargs))
                     except(KeyboardInterrupt, SystemExit):
                         print("退出所有的任务")
+                        break
+                    except(TimeoutError, IOError, Exception):
+                        print("其他异常导致任务执行失败, 失败位置%s" % index)
                         break
                     index += 1
 

@@ -145,8 +145,8 @@ class AsyncFrDownload(AsyncTask):
             self.table.drop()
         # 设置并发数量，为10
         self.concurrent_num = 15
-        # 开始请求数据 完成87个任务
-        self.run_tasks(stock_list)
+        # 开始请求数据 全部完成
+        self.run_tasks(stock_list, last_fail_index=147)
 
 
 AsyncFrDownload().start_download()
