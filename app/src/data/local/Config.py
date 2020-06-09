@@ -111,53 +111,54 @@ class IndustryType(Enum):
 
     @staticmethod
     def get_type_by_name(industry_name):
-        if IndustryType._check_industry_name(industry_name, IndustryType.AGRICULTURAL_FAH_FISHERY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.AGRICULTURAL_FAH_FISHERY):
             return IndustryType.AGRICULTURAL_FAH_FISHERY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.MINING_INDUSTRY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.MINING_INDUSTRY):
             return IndustryType.MINING_INDUSTRY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.MANUFACTURING.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.MANUFACTURING):
             return IndustryType.MANUFACTURING.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.WATER_ELECTRICITY_GAS.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.WATER_ELECTRICITY_GAS):
             return IndustryType.WATER_ELECTRICITY_GAS.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.CONSTRUCTION_INDUSTRY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.CONSTRUCTION_INDUSTRY):
             return IndustryType.CONSTRUCTION_INDUSTRY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.WHOLESALE_RETAIL.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.WHOLESALE_RETAIL):
             return IndustryType.WHOLESALE_RETAIL.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.TRANSPORTATION_STORAGE.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.TRANSPORTATION_STORAGE):
             return IndustryType.TRANSPORTATION_STORAGE.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.ACCOMMODATION.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.ACCOMMODATION):
             return IndustryType.ACCOMMODATION.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.INFORMATION_TECHNOLOGY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.INFORMATION_TECHNOLOGY):
             return IndustryType.INFORMATION_TECHNOLOGY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.FINANCIAL_INDUSTRY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.FINANCIAL_INDUSTRY):
             return IndustryType.FINANCIAL_INDUSTRY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.REAL_ESTATE_INDUSTRY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.REAL_ESTATE_INDUSTRY):
             return IndustryType.REAL_ESTATE_INDUSTRY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.BUSINESS_SERVICES.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.BUSINESS_SERVICES):
             return IndustryType.BUSINESS_SERVICES.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.RESEARCH_SERVICE.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.RESEARCH_SERVICE):
             return IndustryType.RESEARCH_SERVICE.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.PUBLIC_ENVIRONMENTAL_PROTECTION.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.PUBLIC_ENVIRONMENTAL_PROTECTION):
             return IndustryType.PUBLIC_ENVIRONMENTAL_PROTECTION.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.RESIDENT_SERVICE.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.RESIDENT_SERVICE):
             return IndustryType.RESIDENT_SERVICE.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.EDUCATION_INDUSTRY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.EDUCATION_INDUSTRY):
             return IndustryType.EDUCATION_INDUSTRY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.HEALTH_INDUSTRY.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.HEALTH_INDUSTRY):
             return IndustryType.HEALTH_INDUSTRY.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.CULTURAL_COMMUNICATION.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.CULTURAL_COMMUNICATION):
             return IndustryType.CULTURAL_COMMUNICATION.get_industry_type()
-        if IndustryType._check_industry_name(industry_name, IndustryType.COMPREHENSIVE.get_names()):
+        if IndustryType._check_industry_name(industry_name, IndustryType.COMPREHENSIVE):
             return IndustryType.COMPREHENSIVE.get_industry_type()
 
     @staticmethod
-    def _check_industry_name(industry_name, industry_des_list):
+    def _check_industry_name(industry_name, industry_type):
         """
         检查列表中是否包含行业页面，使用正则进行匹配
         :param industry_name: 需要检查的行业名称
-        :param industry_des_list: 行业名称列表
+        :param industry_type: 行业类型
         :return: 包含返回True
         """
+        industry_des_list = industry_type.get_names()
         if isinstance(industry_des_list, list):
             for industry_des in industry_des_list:
                 result_list = re.findall(industry_name, industry_des)
@@ -178,6 +179,34 @@ class IndustryType(Enum):
         :return: 类型名
         """
         return self._industry_des_list
+
+    @staticmethod
+    def get_all_type():
+        """
+        获取所有的类型列表
+        :return: 返回对应的类型
+        """
+        return [
+            IndustryType.AGRICULTURAL_FAH_FISHERY,
+            IndustryType.MINING_INDUSTRY,
+            IndustryType.MANUFACTURING,
+            IndustryType.WATER_ELECTRICITY_GAS,
+            IndustryType.CONSTRUCTION_INDUSTRY,
+            IndustryType.WHOLESALE_RETAIL,
+            IndustryType.TRANSPORTATION_STORAGE,
+            IndustryType.ACCOMMODATION,
+            IndustryType.INFORMATION_TECHNOLOGY,
+            IndustryType.FINANCIAL_INDUSTRY,
+            IndustryType.REAL_ESTATE_INDUSTRY,
+            IndustryType.BUSINESS_SERVICES,
+            IndustryType.RESEARCH_SERVICE,
+            IndustryType.PUBLIC_ENVIRONMENTAL_PROTECTION,
+            IndustryType.RESIDENT_SERVICE,
+            IndustryType.EDUCATION_INDUSTRY,
+            IndustryType.HEALTH_INDUSTRY,
+            IndustryType.CULTURAL_COMMUNICATION,
+            IndustryType.COMPREHENSIVE,
+        ]
 
     # 农业、林业、牧业、渔业
     AGRICULTURAL_FAH_FISHERY = (1, ["农林牧渔", "农、林、牧、渔业"])

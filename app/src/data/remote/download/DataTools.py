@@ -2,6 +2,7 @@ import asyncio
 import aiohttp as http
 import abc
 import random
+import os
 from app.src.utils.TimeUtils import StockTimeUtils
 
 
@@ -188,3 +189,80 @@ class AsyncRequest(AsyncTask):
         async with http.ClientSession(cookies=kwargs.get("cookies")) as client:
             # 重新组装任务列表
             await self._create_tasks(data_list, client=client, **kwargs)
+
+
+class FileUtils(object):
+    """
+    文件工具类
+    """
+
+    def create_dir(self, dir_name):
+        """
+        在当前目录下面创建目录，如果目录没有存在
+        :param dir_name:
+        """
+        dir_path = self.join(dir_name)
+        if self.is_exist(dir_path) is False:
+            os.mkdir(dir_path)
+
+    @classmethod
+    def is_exist(cls, file):
+        """
+        判断给定的文件是否存在
+        :param file: 需要检查的文件
+        :return: True表示存在，否则表示不存在
+        """
+        return os.path.exists(file)
+
+    @classmethod
+    def join(cls, dir_name):
+        """
+        将给的目录加入到当前的目录下面
+        :param dir_name: 给定的目录名
+        :return: 返回链接的文件路径字符串
+        """
+        return os.path.join(os.getcwd(), dir_name)
+
+    def write(self, file_name, write_content, write_mode="wb"):
+        """
+        异步将指定内容写入指定文件
+        :param file_name: 文件名
+        :param write_content: 写入的内容
+        :param write_mode: 打开模式，默认是"wb"
+        """
+        if self.is_exist(file_name) and write_content:
+            with open(file_name, write_mode) as file:
+                file.write(write_content)
+        else:
+            raise ValueError("file name is not exist or content is None")
+
+    @classmethod
+    def isdir(cls, file):
+        """
+        判断是否目录
+        :param file: 给的文件
+        :return: True表示目录，否则不是
+        """
+        return os.path.isdir(file)
+
+    @classmethod
+    def isfile(cls, file):
+        """
+        判断是否文件
+        :param file: 给定文件
+        :return: True表示文件，否则不是
+        """
+        return os.path.isfile(file)
+
+    def delete(self, file):
+        """
+        删除文件
+        :param file: 文件
+        """
+        if self.is_exist(file):
+            if self.isdir(file):
+                os.rmdir(file)
+            elif self.isfile(file):
+                os.remove(file)
+            else:
+                raise ValueError("% is not file or dir" % file)
