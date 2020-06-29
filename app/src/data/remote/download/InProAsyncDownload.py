@@ -1,5 +1,5 @@
 import aiohttp
-import time
+# from app.src.data.local.PdfParser import PdfParser
 from app.src.data.local.Config import IndustryType
 from app.src.data.database.table.StockTable import StockTable
 from app.src.data.database.table.StockFrTable import StockFrTable
@@ -18,32 +18,41 @@ class AsyncDownload(AsyncTask, FileUtils):
             if client:
                 print("start task %s" % len(data))
                 for stock in data:
-                    with self.fr_table.find(
-                            filter={
-                                "code": stock["stock_code"]
-                            }).limit(1) as fr_stock:
-                        url = fr_stock["pdf_path"]
-                        print("url=", url)
-                        if url is None:
-                            continue
-                        async with client.get(url) as response:
-                            if response.status == 200:
-                                print("url=%s status=%s" % (url, response.status))
-                                await self._write_file(response)
+                    stock_code = stock["stock_code"]
+                    fr_stock = self.fr_table.find({
+                                "code": stock_code
+                            }).limit(1)
+                    url = fr_stock[0]["pdf_path"]
+                    fr_stock.close()
+                    if url is None:
+                        continue
+                    async with client.get(url) as response:
+                        request_code = response.status
+                        if request_code == 200:
+                            print("%s 请求成功, 开始写入")
+                            await self._write_file(response, stock_code)
+                        else:
+                            print("%s 请求失败 错误码为%s" % (url, request_code))
             else:
                 raise ValueError("client is None")
 
-    async def _write_file(self, response):
-        file_path = self.join("%s.PDF" % time.time())
-        if self.is_exist(file_path):
-            with open(file_path, "wb") as file:
-                while True:
-                    # 读取响应内容
-                    data = await response.content.read(1024)
-                    if not data:
-                        break
-                    # 异步写入内容
-                    file.write(data)
+    async def _write_file(self, response, code):
+        file_path = self.create_dir("cache")
+        file_path = self.join("%s.PDF" % code, file_path)
+        with open(file_path, "wb") as file:
+            while True:
+                # 读取响应内容
+                data = await response.content.read(1024)
+                if not data:
+                    break
+                # 异步写入内容
+                file.write(data)
+        # self._pdf_parser(file_path)
+
+    # def _pdf_parser(self, file_path):
+    #     with PdfParser.open(file_path) as pdf:
+    #         pdf.start_parser()
+    #     self.delete(file_path)
 
     async def package_tasks(self, data_list, **kwargs):
         async with aiohttp.ClientSession() as session:

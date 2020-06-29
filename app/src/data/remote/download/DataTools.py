@@ -88,8 +88,8 @@ class AsyncTask(metaclass=abc.ABCMeta):
                     except(KeyboardInterrupt, SystemExit):
                         print("退出所有的任务")
                         break
-                    except(TimeoutError, IOError, Exception):
-                        print("其他异常导致任务执行失败, 失败位置%s" % index)
+                    except Exception as e:
+                        print("其他异常导致任务执行失败, 失败位置%s TimeoutError" % index, e)
                         break
                     index += 1
 
@@ -204,6 +204,7 @@ class FileUtils(object):
         dir_path = self.join(dir_name)
         if self.is_exist(dir_path) is False:
             os.mkdir(dir_path)
+        return dir_path
 
     @classmethod
     def is_exist(cls, file):
@@ -215,13 +216,14 @@ class FileUtils(object):
         return os.path.exists(file)
 
     @classmethod
-    def join(cls, dir_name):
+    def join(cls, dir_name, start_dir=os.getcwd()):
         """
         将给的目录加入到当前的目录下面
         :param dir_name: 给定的目录名
+        :param start_dir 开始目录
         :return: 返回链接的文件路径字符串
         """
-        return os.path.join(os.getcwd(), dir_name)
+        return os.path.join(start_dir, dir_name)
 
     def write(self, file_name, write_content, write_mode="wb"):
         """
@@ -266,3 +268,12 @@ class FileUtils(object):
                 os.remove(file)
             else:
                 raise ValueError("% is not file or dir" % file)
+
+    def files(self, dir_path):
+        """
+        获取所有的指定目录下所有的文件路径
+        :param dir_path: 指定的目录名路径
+        :return: 所有文件路径
+        """
+        file_name_list = os.listdir(dir_path)
+        return [self.join(file_name, dir_path) for file_name in file_name_list]
