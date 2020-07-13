@@ -1,7 +1,8 @@
 import os
 import re
 import abc
-from app.src.data.remote.download.DataTools import FileUtils
+import asyncio
+from app.src.data.remote.download.DataTools import FileUtils, AsyncTask
 from pdfplumber.pdf import PDF
 from pdfplumber.page import Page
 from pdfminer.pdfpage import PDFPage
@@ -462,22 +463,29 @@ class PdfParserImpl(AbstractPdfParser):
         self.project_name_list(flow_table_content, "流量表")
 
 
-def scan_pdf_file():
-    """
-    扫描pdf文件
-    """
-    cache_dir_name = "/Users/robot/PycharmProjects/EatAllSystem/app/src/data/remote/download/cache"
-    file_list = FileUtils().files(cache_dir_name)
-    file_list = file_list[0: 1]
-    file_list_size = len(file_list)
-    if file_list_size > 0:
-        for pdf_path in file_list:
-            print(pdf_path)
-            with PdfParserImpl.open(pdf_path) as pdf:
+class MultiPdfParser(AsyncTask):
+
+    async def task(self, data, **kwargs):
+        loop = asyncio.get_event_loop()
+
+        def read_pdf_and_parser():
+            with PdfParserImpl.open(data) as pdf:
                 pdf.start_parser()
-    else:
-        print("没有找到文件")
+
+        await loop.run_in_executor(None, read_pdf_and_parser)
+
+    def interval_time(self):
+        return 0
+
+    def run_parser(self):
+        """
+        扫描pdf文件
+        """
+        cache_dir_name = "/Users/robot/PycharmProjects/EatAllSystem/app/src/data/remote/download/cache"
+        file_list = FileUtils().files(cache_dir_name)
+        self.run_tasks(file_list)
 
 
-scan_pdf_file()
+multi_pdf_parser = MultiPdfParser()
+multi_pdf_parser.run_parser()
 

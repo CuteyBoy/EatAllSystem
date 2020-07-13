@@ -11,7 +11,7 @@ class AsyncTask(metaclass=abc.ABCMeta):
     封装使用协程来执行异步任务的抽象类
     """
 
-    def __init__(self, concurrent_num=1):
+    def __init__(self, concurrent_num=10):
         # 任务并发个数，默认是10
         self.concurrent_num = concurrent_num
 
