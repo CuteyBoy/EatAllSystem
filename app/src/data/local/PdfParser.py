@@ -2,6 +2,7 @@ import os
 import re
 import abc
 import asyncio
+from itertools import product
 from app.src.data.remote.download.DataTools import FileUtils, AsyncTask
 from app.src.pdf.pdf import PDF
 from app.src.pdf.page import Page
@@ -227,6 +228,8 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         self.profit_table_content = None
         self.flow_table_start_index = -1
         self.flow_table_content = None
+        self.strategy_list = list(product(["lines", "text", "lines_strict", "explicit"], repeat=2))
+        self.explicit_list = ["line", "rect", "curve"]
 
     def _is_find_table(self, page):
         """
@@ -237,10 +240,10 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         return len(page.find_tables(self.get_table_setting())) > 0
 
     @abc.abstractmethod
-    def on_find_debt_table(self, debt_table_content):
+    def on_find_debt_table(self, debt_table):
         """
         找到负债表内容
-        :param debt_table_content: 负债表内容，准备解析
+        :param debt_table: 负债表内容，准备解析
         """
         pass
 
@@ -287,19 +290,32 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         else:
             self.flow_table_content = self.flow_table_content + new_content if is_add else new_content
 
-    def _set_callback(self, table_type):
+    def _set_callback(self, page, table_type, index=0, vertical_strategy="lines", horizontal_strategy="lines"):
         """
         设置回调
         :param table_type: 表类型
         """
-        if table_type == 1:
-            self.on_find_debt_table(self.debt_table_content)
-        elif table_type == 2:
-            self.on_find_profit_table(self.profit_table_content)
+        table_settings = {
+            "vertical_strategy": vertical_strategy,
+            "horizontal_strategy": horizontal_strategy,
+        }
+        table_data = page.extract_table(table_settings=table_settings)
+        if table_data is None:
+            index += 1
+            if index < len(self.strategy_list):
+                vertical, horizontal = self.strategy_list[index]
+                self._set_callback(page, table_type, index, vertical, horizontal)
+            else:
+                print("读取dpf表格错误！")
         else:
-            self.on_find_flow_table(self.flow_table_content)
+            if table_type == 1:
+                self.on_find_debt_table(table_data)
+            elif table_type == 2:
+                self.on_find_profit_table(table_data)
+            else:
+                self.on_find_flow_table(table_data)
 
-    def _find_table_filter(self, table_type, start_index=-1, page=None, page_content=None):
+    def _find_table_filter(self, page_index, table_type, start_index=-1, page=None, page_content=None):
         """
         找表筛选器
         :param table_type: 表类型
@@ -324,21 +340,21 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
             self._set_content(table_type, True, page_content)
         if start_index == 2:
             self._set_start_index(table_type, 3)
-            self._set_callback(table_type)
+            self._set_callback(page, table_type)
 
     @abc.abstractmethod
-    def on_find_profit_table(self, profit_table_content):
+    def on_find_profit_table(self, profit_table):
         """
         找到利润表
-        :param profit_table_content: 利润表内容
+        :param profit_table: 利润表内容
         """
         pass
 
     @abc.abstractmethod
-    def on_find_flow_table(self, flow_table_content):
+    def on_find_flow_table(self, flow_table):
         """
         找到现金流量表
-        :param flow_table_content: 表内容
+        :param flow_table: 表内容
         """
         pass
 
@@ -392,7 +408,7 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
             "intersection_y_tolerance": None
         }
 
-    def start_parser(self):
+    def start_parser(self, pdf_path):
         """
         该方法暴露开始解析目标页面的数据，解析后的数据进行存入数据库
         可以很方便的进行一边解析，一边扫描满足需要的股票
@@ -400,17 +416,18 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         print("start parser")
         doc_top = 0
         # 将pdf加载到内存
+        print(pdf_path)
         page_doc_list = enumerate(PDFPage.create_pages(self.doc))
         for index, page_doc in page_doc_list:
             # 生存页面对象，方便解析
             page = Page(self, page_doc, page_number=index + 1, initial_doctop=doc_top)
-            is_finish_parser = self._page_parser(page, page.extract_text())
+            is_finish_parser = self._page_parser(index + 1, page, page.extract_text())
             if is_finish_parser:
                 # 说明所有需要的表都找到了，直接退出
                 break
             doc_top += page.height
 
-    def _page_parser(self, page, page_text):
+    def _page_parser(self, page_index, page, page_text):
         """
         页面解析器
         :param page: 页面
@@ -419,11 +436,11 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         """
         is_end_flag = False
         if self.debt_table_start_index < 3:
-            self._find_table_filter(1, self.debt_table_start_index, page, page_text)
+            self._find_table_filter(page_index, 1, self.debt_table_start_index, page, page_text)
         elif self.profit_table_start_index < 3:
-            self._find_table_filter(2, self.profit_table_start_index, page, page_text)
+            self._find_table_filter(page_index, 2, self.profit_table_start_index, page, page_text)
         elif self.flow_table_start_index < 3:
-            self._find_table_filter(3, self.flow_table_start_index, page, page_text)
+            self._find_table_filter(page_index, 3, self.flow_table_start_index, page, page_text)
         else:
             is_end_flag = True
         return is_end_flag
@@ -442,25 +459,22 @@ class PdfParserImpl(AbstractPdfParser):
                  password=""):
         super().__init__(stream, pages, laparams, precision, password)
 
-    def project_name_list(self, content, error_hint):
-        project_list = self.get_match_list(content)
-        project_list_size = len(project_list)
-        if project_list_size > 0:
-            for project in project_list:
-                project = str(project).replace(" ", "")
-                if len(project) > 0:
-                    print(project)
-        else:
-            print("未找到%s表内容" % error_hint)
+    @classmethod
+    def _parse_project(cls, table):
+        for row in table:
+            print(row[0])
 
-    def on_find_debt_table(self, debt_table_content):
-        self.project_name_list(debt_table_content, "负债表")
+    def on_find_debt_table(self, debt_table):
+        print("负债表\n")
+        self._parse_project(debt_table)
 
-    def on_find_profit_table(self, profit_table_content):
-        self.project_name_list(profit_table_content, "利润表")
+    def on_find_profit_table(self, profit_table):
+        print("现金利润表\n")
+        self._parse_project(profit_table)
 
-    def on_find_flow_table(self, flow_table_content):
-        self.project_name_list(flow_table_content, "流量表")
+    def on_find_flow_table(self, flow_table):
+        print("现金流量表\n")
+        self._parse_project(flow_table)
 
 
 class MultiPdfParser(AsyncTask):
@@ -470,7 +484,7 @@ class MultiPdfParser(AsyncTask):
 
         def read_pdf_and_parser():
             with PdfParserImpl.open(data) as pdf:
-                pdf.start_parser()
+                pdf.start_parser(data)
 
         await loop.run_in_executor(None, read_pdf_and_parser)
 
@@ -481,7 +495,7 @@ class MultiPdfParser(AsyncTask):
         """
         扫描pdf文件
         """
-        cache_dir_name = "/Users/robot/PycharmProjects/EatAllSystem/app/src/data/remote/download/cache"
+        cache_dir_name = "D:\\work\\python\\EatAllSystem\\app\\src\\data\\remote\\download\\cache"
         file_list = FileUtils().files(cache_dir_name)
         self.run_tasks(file_list)
 
