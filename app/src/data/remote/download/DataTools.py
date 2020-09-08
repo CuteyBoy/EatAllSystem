@@ -225,18 +225,16 @@ class FileUtils(object):
         """
         return os.path.join(start_dir, dir_name)
 
-    def write(self, file_name, write_content, write_mode="wb"):
+    @classmethod
+    def write(cls, file_name, write_content, write_mode="wb"):
         """
         异步将指定内容写入指定文件
         :param file_name: 文件名
         :param write_content: 写入的内容
         :param write_mode: 打开模式，默认是"wb"
         """
-        if self.is_exist(file_name) and write_content:
-            with open(file_name, write_mode) as file:
-                file.write(write_content)
-        else:
-            raise ValueError("file name is not exist or content is None")
+        with open(file_name, write_mode) as file:
+            file.write(write_content)
 
     @classmethod
     def isdir(cls, file):
