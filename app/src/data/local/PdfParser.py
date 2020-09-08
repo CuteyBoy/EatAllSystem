@@ -3,8 +3,8 @@ import re
 import abc
 import asyncio
 from app.src.data.remote.download.DataTools import FileUtils, AsyncTask
-from pdfplumber.pdf import PDF
-from pdfplumber.page import Page
+from app.src.pdf.pdf import PDF
+from app.src.pdf.page import Page
 from pdfminer.pdfpage import PDFPage
 from app.src.data.database.table.StockFrTable import StockFrTable
 
