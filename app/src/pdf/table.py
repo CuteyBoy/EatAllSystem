@@ -353,75 +353,91 @@ class Table(object):
             rows.append(row)
         return rows
 
-    def extract(
-            self,
-            x_tolerance=utils.DEFAULT_X_TOLERANCE,
-            y_tolerance=utils.DEFAULT_Y_TOLERANCE,
-    ):
+    @classmethod
+    def _char_in_bbox(cls, char, bbox):
+        v_mid = (char["top"] + char["bottom"]) / 2
+        h_mid = (char["x0"] + char["x1"]) / 2
+        x0, top, x1, bottom = bbox
+        return (
+                (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
+        )
 
+    def extract(
+        self,
+        x_tolerance=utils.DEFAULT_X_TOLERANCE,
+        y_tolerance=utils.DEFAULT_Y_TOLERANCE,
+    ):
         chars = self.page.chars
         table_arr = []
-
-        def char_in_bbox(char, bbox):
-            v_mid = (char["top"] + char["bottom"]) / 2
-            h_mid = (char["x0"] + char["x1"]) / 2
-            x0, top, x1, bottom = bbox
-            return (
-                    (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
-            )
-
         index = 0
         for row in self.rows:
-            arr = []
-            row_chars = [char for char in chars if char_in_bbox(char, row.bbox)]
-            if self._stitching_wrap_hidden(table_arr, row_chars, index) is False:
-                break
-            for cell in row.cells:
-                if cell is None:
-                    cell_text = None
-                else:
-                    cell_chars = [
-                        char for char in row_chars if char_in_bbox(char, cell)
-                    ]
-                    if len(cell_chars):
-                        cell_text = utils.extract_text(
-                            cell_chars, x_tolerance=x_tolerance, y_tolerance=y_tolerance
-                        ).strip()
-                    else:
-                        cell_text = ""
-                arr.append(cell_text)
+            row_chars = self._stitching_wrap_hidden(table_arr, row, chars, index, x_tolerance, y_tolerance)
+            arr = self._parse_line_data(row, row_chars, x_tolerance, y_tolerance)
             if self._stitching_wrap(table_arr, arr, index) is False:
                 continue
+            if len(arr) > 0 and '\n' in arr[0]:
+                # 去除一第一个cell中文本含有\n字符的数据
+                arr[0] = arr[0].replace('\n', '')
             table_arr.append(arr)
             index += 1
         return table_arr
 
-    @classmethod
-    def _stitching_wrap_hidden(cls, table_arr, row_chars, index):
+    def _parse_line_data(self, row, row_chars, x_tolerance, y_tolerance):
+        """
+        解析行数据
+        :param row: 行
+        :param row_chars: 行里面的字符数据
+        :param x_tolerance: 偏移量
+        :param y_tolerance: 偏移量
+        :return: 返回解析后的行数据
+        """
+        arr = []
+        for cell in row.cells:
+            if cell is None:
+                cell_text = None
+            else:
+                cell_chars = [
+                    char for char in row_chars if self._char_in_bbox(char, cell)
+                ]
+                if len(cell_chars):
+                    cell_text = utils.extract_text(
+                        cell_chars, x_tolerance=x_tolerance, y_tolerance=y_tolerance
+                    ).strip()
+                else:
+                    cell_text = ""
+            arr.append(cell_text)
+        return arr
+
+    def _stitching_wrap_hidden(self, table_arr, row, chars, index, x_tolerance, y_tolerance):
         """
         用于处理换行后被隐藏的部分数据
         :param table_arr: 已经解析的表数据
-        :param row_chars: 一行包含的字符信息
+        :param row: 行数据
+        :param chars: 所有的字符数据
         :param index: 索引位置
         :return: 返回True表示需要处理，否不需要
         """
-        is_continue = True
+        row_chars = [char for char in chars if self._char_in_bbox(char, row.bbox)]
         if index == 0:
-            return is_continue
+            return row_chars
+        arr = self._parse_line_data(row, row_chars, x_tolerance, y_tolerance)
+        if len(arr) > 0 and '\n'in arr[0]:
+            return row_chars
         row_chars_size = len(row_chars)
+        word_width = row_chars[0]['width']
         for position in range(row_chars_size):
             if position == 0:
                 continue
-            if row_chars[0]['x0'] == row_chars[position]['x0']:
+            threshold = abs(row_chars[position]['x0'] - row_chars[0]['x0'])
+            if threshold < word_width:
                 last_cell_text = "".join([char['text'] for char in row_chars[0: position]])
                 row_chars = row_chars[position: row_chars_size]
                 last_row_arr = table_arr[index - 1]
                 first_cell_text = last_row_arr[0] + last_cell_text
                 last_row_arr[0] = first_cell_text
                 table_arr[index - 1] = last_row_arr
-                is_continue = False
                 break
-        return is_continue
+        return row_chars
 
     @classmethod
     def _stitching_wrap(cls, table_arr, arr, index):
