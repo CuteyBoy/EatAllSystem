@@ -421,14 +421,17 @@ class Table(object):
         if index == 0:
             return row_chars
         arr = self._parse_line_data(row, row_chars, x_tolerance, y_tolerance)
-        if len(arr) > 0 and '\n'in arr[0]:
+        line_cell_size = len(arr)
+        if line_cell_size <= 0 or (line_cell_size > 0 and arr[0] is None) or (line_cell_size > 0 and '\n'in arr[0]):
             return row_chars
         row_chars_size = len(row_chars)
-        word_width = row_chars[0]['width']
+        word_width = int(row_chars[0]['width'])
         for position in range(row_chars_size):
             if position == 0:
                 continue
-            threshold = abs(row_chars[position]['x0'] - row_chars[0]['x0'])
+            if len(arr) <= 0 or position >= len(arr[0]):
+                break
+            threshold = abs(int(row_chars[position]['x0'] - row_chars[0]['x0']))
             if threshold < word_width:
                 last_cell_text = "".join([char['text'] for char in row_chars[0: position]])
                 row_chars = row_chars[position: row_chars_size]
