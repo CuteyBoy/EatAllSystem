@@ -323,10 +323,25 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         else:
             print("未找到任何表")
 
+    @classmethod
+    def _clear_useless_cell(cls, table_data):
+        is_clear = False
+        for row_data in table_data:
+            if row_data[0] is '':
+                is_clear = True
+                break
+        if is_clear is True:
+            for row_data in table_data:
+                first_cell = row_data[0]
+                row_data.remove(first_cell)
+                if first_cell is not '':
+                    row_data[0] = first_cell + row_data[0]
+
     def _parse_table(self, is_start_page, page, index=0, vertical_strategy="lines", horizontal_strategy="lines"):
         table_settings = {
             "vertical_strategy": vertical_strategy,
             "horizontal_strategy": horizontal_strategy,
+            "keep_blank_chars": True if vertical_strategy is "text" else False
         }
         table_data = self._extract_table_data(is_start_page, page, table_settings)
         if table_data is None:
@@ -337,6 +352,9 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
             new_table_data = self._crop_page(is_start_page, page, table_settings, len(table_data))
             if new_table_data:
                 table_data = new_table_data
+        if table_data and vertical_strategy is 'text':
+            # 只有策略是text的时候才进行清除前面的无用cell
+            self._clear_useless_cell(table_data)
         return table_data
 
     @classmethod
@@ -541,7 +559,7 @@ class MultiPdfParser(AsyncTask):
         扫描pdf文件
         """
         # file_list = FileUtils().files(os.getcwd() + os.sep + "cache")
-        self.run_tasks([os.getcwd() + os.sep + "cache" + os.sep + "000001.PDF"])
+        self.run_tasks([os.getcwd() + os.sep + "cache" + os.sep + "test_pdf_3.PDF"])
 
 
 multi_pdf_parser = MultiPdfParser()
