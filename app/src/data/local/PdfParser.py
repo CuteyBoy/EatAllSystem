@@ -230,8 +230,6 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         self.flow_table_content = None
         self.page_list = []
         self.pdf_path = None
-        self.strategy_list = list(product(["lines", "text"], repeat=2))
-        self.explicit_list = ["line", "rect", "curve"]
 
     def _is_find_table(self, page, index=0, vertical_strategy="lines", horizontal_strategy="lines"):
         """
@@ -310,8 +308,9 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         :param table_type: 表类型
         """
         table_data = []
-        for page in self.page_list:
-            page_data = self._parse_table(page)
+        page_size = len(self.page_list)
+        for index in range(page_size):
+            page_data = self._parse_table(index == 0, self.page_list[index])
             if page_data:
                 table_data.extend(page_data)
         if len(table_data) > 0:
@@ -324,17 +323,41 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
         else:
             print("未找到任何表")
 
-    def _parse_table(self, page, index=0, vertical_strategy="lines", horizontal_strategy="lines"):
+    def _parse_table(self, is_start_page, page, index=0, vertical_strategy="lines", horizontal_strategy="lines"):
         table_settings = {
             "vertical_strategy": vertical_strategy,
             "horizontal_strategy": horizontal_strategy,
         }
-        table_data = page.extract_table(table_settings=table_settings)
+        table_data = self._extract_table_data(is_start_page, page, table_settings)
         if table_data is None:
             index += 1
             if index <= 1:
-                return self._parse_table(page, index, "text", "text")
+                return self._parse_table(is_start_page, page, index, "text", "text")
+        if table_data and vertical_strategy is "text":
+            new_table_data = self._crop_page(is_start_page, page, table_settings, len(table_data))
+            if new_table_data:
+                table_data = new_table_data
         return table_data
+
+    @classmethod
+    def _extract_table_data(cls, is_start_page, page, table_settings):
+        return page.extract_last_table(
+            table_settings=table_settings
+        ) if is_start_page else page.extract_first_table(
+            table_settings=table_settings
+        )
+
+    @classmethod
+    def _crop_page(cls, is_start_page, page, table_settings, old_data_size, crop_height=20):
+        crop_page = page.crop((0, 0, page.width, page.height - crop_height))
+        table_data = cls._extract_table_data(is_start_page, crop_page, table_settings)
+        table_data_size = len(table_data)
+        if table_data_size > old_data_size:
+            return table_data
+        elif table_data_size < old_data_size:
+            return None
+        else:
+            return cls._crop_page(is_start_page, crop_page, table_settings, old_data_size, crop_height + 20)
 
     def _find_table_filter(self, page_index, table_type, start_index=-1, page=None, page_content=None):
         """

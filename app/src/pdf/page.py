@@ -230,6 +230,22 @@ class Page(Container):
         largest = list(sorted(tables, key=sorter))[0]
         return largest.extract()
 
+    def extract_first_table(self, table_settings=None):
+        if table_settings is None:
+            table_settings = {}
+        tables = self.find_tables(table_settings)
+        if len(tables) == 0:
+            return None
+        return tables[0].extract()
+
+    def extract_last_table(self, table_settings=None):
+        if table_settings is None:
+            table_settings = {}
+        tables = self.find_tables(table_settings)
+        if len(tables) == 0:
+            return None
+        return tables[-1].extract()
+
     def extract_text(self, **kwargs):
         return utils.extract_text(self.chars, **kwargs)
 
