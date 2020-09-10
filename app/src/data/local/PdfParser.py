@@ -337,22 +337,29 @@ class AbstractPdfParser(PDF, metaclass=abc.ABCMeta):
                 if first_cell is not '':
                     row_data[0] = first_cell + row_data[0]
 
-    def _parse_table(self, is_start_page, page, index=0, vertical_strategy="lines", horizontal_strategy="lines"):
+    def _parse_table(self, is_start_page, page, index=0, old_table_data=None, strategy="lines", is_keep_blank=False):
         table_settings = {
-            "vertical_strategy": vertical_strategy,
-            "horizontal_strategy": horizontal_strategy,
-            "keep_blank_chars": True if vertical_strategy is "text" else False
+            "vertical_strategy": strategy,
+            "horizontal_strategy": strategy,
+            "keep_blank_chars": is_keep_blank
         }
         table_data = self._extract_table_data(is_start_page, page, table_settings)
+        is_line_strategy = strategy == "lines"
         if table_data is None:
             index += 1
             if index <= 1:
-                return self._parse_table(is_start_page, page, index, "text", "text")
-        if table_data and vertical_strategy is "text":
+                return self._parse_table(is_start_page, page, index, None, "text", True)
+        elif strategy is "lines" and old_table_data is None:
+            return self._parse_table(is_start_page, page, index, table_data, "text", False)
+        elif strategy is "text" and old_table_data:
+            if len(table_data[0]) <= len(old_table_data[0]):
+                is_line_strategy = True
+                table_data = old_table_data
+        if table_data and is_line_strategy is False:
             new_table_data = self._crop_page(is_start_page, page, table_settings, len(table_data))
             if new_table_data:
                 table_data = new_table_data
-        if table_data and vertical_strategy is 'text':
+        if table_data and is_line_strategy is False and is_keep_blank:
             # 只有策略是text的时候才进行清除前面的无用cell
             self._clear_useless_cell(table_data)
         return table_data
@@ -559,7 +566,7 @@ class MultiPdfParser(AsyncTask):
         扫描pdf文件
         """
         # file_list = FileUtils().files(os.getcwd() + os.sep + "cache")
-        self.run_tasks([os.getcwd() + os.sep + "cache" + os.sep + "test_pdf_3.PDF"])
+        self.run_tasks([os.getcwd() + os.sep + "cache" + os.sep + "000002.PDF"])
 
 
 multi_pdf_parser = MultiPdfParser()
